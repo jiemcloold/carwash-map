@@ -139,7 +139,7 @@
 
     <div id="info">
         <div id="infoText">正在定位...</div>
-        <div id="updateTime">数据更新: 2025/10/6 13:18:20</div>
+        <div id="updateTime">数据更新: 2025/10/6 13:20:03</div>
     </div>
 
     <button id="cancelRouteBtn" class="cancel-route-btn hidden" onclick="cancelRoute()">✕ 取消路线</button>
@@ -360,7 +360,7 @@
                             <span style="font-size:14px;color:#666;flex:1;">📍 ${shop.address}</span>
                             <button onclick="copyText('${shop.address.replace(/'/g, "\\'")}', '地址')" style="padding:4px 8px;background:#f0f0f0;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0;">📋 复制</button>
                         </div>
-                        ${shop.phone ? `<a href="tel:${shop.phone}" style="display:block;margin:4px 0;padding:6px 0;font-size:14px;color:#00A870;text-decoration:none;font-weight:500;">📞 ${shop.phone}</a>` : ''}
+                        ${shop.phone ? `<p style="margin:4px 0;font-size:14px;line-height:24px;"><a href="tel:${shop.phone}" style="color:#00A870;text-decoration:none;font-weight:500;">📞 ${shop.phone}</a></p>` : ''}
                         ${shop.workTime ? `<p style="margin:4px 0;font-size:14px;color:#666;">⏰ ${shop.workTime}</p>` : ''}
                         ${myLocation ? `<p style="margin:4px 0;font-size:14px;color:#1989fa;font-weight:500;">📏 ${formatDistance(shop.distance)}</p>` : ''}
                         <button onclick="navigateTo('${shop.name.replace(/'/g, "\\'")}', '${shop.address.replace(/'/g, "\\'")}')" style="width:100%;margin-top:10px;padding:10px;background:#1989fa;color:white;border:none;border-radius:6px;font-size:14px;font-weight:500;">🧭 百度地图导航</button>
