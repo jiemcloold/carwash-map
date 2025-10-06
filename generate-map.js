@@ -388,15 +388,18 @@ function generateMap(shops) {
                 // 添加信息窗口
                 const infoWindow = new BMap.InfoWindow(
                     \`<div style="padding:10px;">
-                        <h3 style="margin:0 0 8px 0;font-size:16px;">\${shop.name}</h3>
-                        <p style="margin:4px 0;font-size:14px;color:#666;">📍 \${shop.address}</p>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <h3 style="margin:0;font-size:16px;flex:1;">\${shop.name}</h3>
+                            <button onclick="copyText('\${shop.name.replace(/'/g, "\\\\'")}', '店名')" style="padding:4px 8px;background:#f0f0f0;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;">📋 复制</button>
+                        </div>
+                        <div style="display:flex;align-items:start;gap:6px;margin:4px 0;">
+                            <span style="font-size:14px;color:#666;flex:1;">📍 \${shop.address}</span>
+                            <button onclick="copyText('\${shop.address.replace(/'/g, "\\\\'")}', '地址')" style="padding:4px 8px;background:#f0f0f0;border:1px solid #ddd;border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0;">📋 复制</button>
+                        </div>
                         \${shop.phone ? \`<p style="margin:4px 0;font-size:14px;"><a href="tel:\${shop.phone}" style="color:#00A870;text-decoration:none;font-weight:500;">📞 \${shop.phone}</a></p>\` : ''}
                         \${shop.workTime ? \`<p style="margin:4px 0;font-size:14px;color:#666;">⏰ \${shop.workTime}</p>\` : ''}
                         \${myLocation ? \`<p style="margin:4px 0;font-size:14px;color:#1989fa;font-weight:500;">📏 \${formatDistance(shop.distance)}</p>\` : ''}
-                        <div style="margin-top:10px;display:flex;gap:8px;">
-                            <button onclick="navigateTo(\${shop.lat}, \${shop.lng}, '\${shop.name.replace(/'/g, "\\\\'")}', '\${shop.address.replace(/'/g, "\\\\'")}', '\${shop.phone || ''}', 'amap')" style="flex:1;padding:8px;background:#00A870;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">🧭 高德导航</button>
-                            <button onclick="navigateTo(\${shop.lat}, \${shop.lng}, '\${shop.name.replace(/'/g, "\\\\'")}', '\${shop.address.replace(/'/g, "\\\\'")}', '\${shop.phone || ''}', 'baidu')" style="flex:1;padding:8px;background:#1989fa;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">🧭 百度导航</button>
-                        </div>
+                        <button onclick="navigateTo('\${shop.name.replace(/'/g, "\\\\'")}', '\${shop.address.replace(/'/g, "\\\\'")}\')" style="width:100%;margin-top:10px;padding:10px;background:#1989fa;color:white;border:none;border-radius:6px;font-size:14px;font-weight:500;">🧭 百度地图导航</button>
                         \${myLocation ? \`<button onclick="showRouteTo(\${shop.lat}, \${shop.lng}, '\${shop.name.replace(/'/g, "\\\\'")}\')" style="width:100%;margin-top:8px;padding:8px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:500;">🗺️ 显示路线</button>\` : ''}
                     </div>\`,
                     { width: 280, height: 0 }
@@ -411,18 +414,43 @@ function generateMap(shops) {
             });
         }
 
+        // 复制文本
+        function copyText(text, label) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert(\`✅ 已复制\${label}：\${text}\`);
+                }).catch(() => {
+                    // 降级方案
+                    fallbackCopy(text, label);
+                });
+            } else {
+                fallbackCopy(text, label);
+            }
+        }
+
+        // 降级复制方案
+        function fallbackCopy(text, label) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                alert(\`✅ 已复制\${label}：\${text}\`);
+            } catch (err) {
+                alert(\`❌ 复制失败，请手动复制：\${text}\`);
+            }
+            document.body.removeChild(textarea);
+        }
+
         // 导航到指定商家
-        function navigateTo(lat, lng, name, address, phone, type) {
+        function navigateTo(name, address) {
             // 构建搜索关键词（店名 + 地址）
             const keyword = name + ' ' + address;
-
-            if (type === 'amap') {
-                // 高德地图 - 直接搜索店名，让用户选择
-                window.location.href = \`https://uri.amap.com/search?query=\${encodeURIComponent(keyword)}&city=北京&src=carwash\`;
-            } else {
-                // 百度地图 - 直接搜索店名，让用户选择
-                window.location.href = \`baidumap://map/place/search?query=\${encodeURIComponent(keyword)}&region=北京&src=carwash\`;
-            }
+            // 百度地图 - 直接搜索店名，让用户选择
+            window.location.href = \`baidumap://map/place/search?query=\${encodeURIComponent(keyword)}&region=北京&src=carwash\`;
         }
 
         // 在地图上显示路线
