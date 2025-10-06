@@ -168,10 +168,30 @@ function generateMap(shops) {
         .cancel-route-btn:active {
             transform: scale(0.95);
         }
+
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
     <div id="loading">正在加载地图...</div>
+    <div id="toast" class="toast"></div>
 
     <div id="info">
         <div id="infoText">正在定位...</div>
@@ -414,11 +434,22 @@ function generateMap(shops) {
             });
         }
 
+        // 显示提示消息
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 5000);
+        }
+
         // 复制文本
         function copyText(text, label) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(() => {
-                    alert(\`✅ 已复制\${label}：\${text}\`);
+                    showToast(\`✅ 已复制\${label}：\${text}\`);
                 }).catch(() => {
                     // 降级方案
                     fallbackCopy(text, label);
@@ -438,9 +469,9 @@ function generateMap(shops) {
             textarea.select();
             try {
                 document.execCommand('copy');
-                alert(\`✅ 已复制\${label}：\${text}\`);
+                showToast(\`✅ 已复制\${label}：\${text}\`);
             } catch (err) {
-                alert(\`❌ 复制失败，请手动复制：\${text}\`);
+                showToast(\`❌ 复制失败，请手动复制：\${text}\`);
             }
             document.body.removeChild(textarea);
         }
