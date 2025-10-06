@@ -190,6 +190,7 @@ function generateMap(shops) {
         let myLocation = null;
         let nearestShop = null;
         let markers = [];
+        let currentDriving = null; // 保存当前路线规划实例
 
         // API 配置
         const API_URL = 'https://chfwb.meiqitc.com/mqh5svr/serviceStore/byAddressDis';
@@ -475,7 +476,6 @@ function generateMap(shops) {
         }
 
         // 在地图上显示路线
-        let currentDriving = null; // 保存当前路线规划实例
         function showRouteTo(destLat, destLng, shopName) {
             if (!myLocation) {
                 return;
