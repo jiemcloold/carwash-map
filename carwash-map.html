@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>洗车店地图 - 北京</title>
+    <script src="https://api.map.baidu.com/api?v=3.0&ak=ZXzuJARUtenyDLmvx4Ixl5MD4nES4U2I"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        #info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            padding: 12px;
+            z-index: 1000;
+            font-size: 14px;
+            color: #333;
+            min-height: 60px;
+        }
+
+        #infoText {
+            line-height: 1.5;
+        }
+
+        #updateTime {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px 40px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 2000;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            top: 80px;
+            right: 10px;
+            padding: 10px 18px;
+            background: #FF6B6B;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(255,107,107,0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .cancel-route-btn {
+            position: fixed;
+            top: 80px;
+            left: 10px;
+            padding: 10px 18px;
+            background: #666;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .cancel-route-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">正在加载地图...</div>
+
+    <div id="info">
+        <div id="infoText">正在定位...</div>
+        <div id="updateTime">数据更新: 2025/10/6 12:26:53</div>
+    </div>
+
+    <button id="cancelRouteBtn" class="cancel-route-btn hidden" onclick="cancelRoute()">✕ 取消路线</button>
+    <button id="refreshBtn" class="refresh-btn" onclick="refreshShops()">🔄 更新商家</button>
+
+    <div id="map"></div>
+
+    <script>
+        let shops = [{"name":"凯瑟琳汽车服务中心","address":"北京市昌平区兴昌佳苑11号楼底商","phone":"13366443737","workTime":"09:00-17:00","lat":40.20725706242559,"lng":116.28113882907262,"originalLng":116.274754,"originalLat":40.200921},{"name":"晶洁洗车店","address":"北京市北京市通州区漷马路与西田阳路交叉口东140米","phone":"15210558528","workTime":"09:00-17:00","lat":39.74591077195179,"lng":116.61549576459119,"originalLng":116.608973,"originalLat":39.739924},{"name":"橄榄绿汽车服务中心","address":"北京市房山区长兴东街9号院8号楼101","phone":"18001328489","workTime":"09:00-17:00","lat":39.771820584100915,"lng":116.19440275177358,"originalLng":116.187903,"originalLat":39.765778},{"name":"北京极跑养车","address":"北京市北京市朝阳区京通快速路与京通快速路入口交叉口东北100米北京极跑养车","phone":"13718127690","workTime":"09:00-17:00","lat":39.91634370930547,"lng":116.59040732267997,"originalLng":116.5838,"originalLat":39.91069},{"name":"金亿辉洗车房","address":"北京市海淀区晋元庄桥南100米","phone":"18618182007","workTime":"09:00-17:00","lat":39.928908232157845,"lng":116.21372895483654,"originalLng":116.207153,"originalLat":39.923187},{"name":"龙腾星辉汽车服务","address":"北京市丰台区南苑镇槐房路44号易净自助洗车（槐房路店）旁边","phone":"13552829882","workTime":"09:00-17:00","lat":39.81941695711039,"lng":116.38298721855982,"originalLng":116.376546,"originalLat":39.813306},{"name":"统一润滑油车至尚养护","address":"北京市朝阳区崔各庄地区京旺家园4区B1-3号底商一层5门","phone":"13436960922","workTime":"09:00-17:00","lat":40.02123664006397,"lng":116.53762904463974,"originalLng":116.531224,"originalLat":40.014944},{"name":"三友恒通洗车之家","address":"北京市丰台区嘉园北路星河苑1号院26号楼底商三友汽车之家","phone":"13121985359","workTime":"09:00-17:00","lat":39.84307967041177,"lng":116.37418866096272,"originalLng":116.367677,"originalLat":39.837123},{"name":"龙岗兴业综合能源服务有限公司","address":"北京市北京市房山区房易路二龙岗公交站南300米路东","phone":"13070185999","workTime":"09:00-17:00","lat":39.60864710627663,"lng":115.91307236316997,"originalLng":115.906661,"originalLat":39.60238},{"name":"北京全顺发达汽车装饰有限公司","address":"北京市密云区果园西路甲14号楼1--2层北京全顺发达汽车装饰有限公司","phone":"13716540888","workTime":"09:00-16:00","lat":40.382571181304414,"lng":116.8333577188086,"originalLng":116.826741,"originalLat":40.376899},{"name":"北京中旺吉业汽车修理有限公司","address":"北京市朝阳区北四环东路1号首汽第四修理厂院内","phone":"13701028962","workTime":"09:00-17:00","lat":39.98168852331318,"lng":116.47487396727732,"originalLng":116.468251,"originalLat":39.976001},{"name":"万通汽车服务店","address":"北京市房山区西潞街道办事处太平庄东里20号楼万通汽车服务店","phone":"13683165944","workTime":"09:00-17:00","lat":39.73845708682599,"lng":116.12640014750811,"originalLng":116.119828,"originalLat":39.73263},{"name":"欣达汽车养护","address":"北京市通州区永顺镇潞邑西路欣达汽车养护中心","phone":"18600797910","workTime":"09:00-17:00","lat":39.9462499215536,"lng":116.69461394527684,"originalLng":116.688033,"originalLat":39.940539},{"name":"北京鑫源汽修服务中心","address":"北京市大兴区北京鑫源汽修服务中心","phone":"13641323231","workTime":"09:00-17:00","lat":39.71174512078099,"lng":116.40524198937786,"originalLng":116.398874,"originalLat":39.705401},{"name":"北京市铁狮飞腾汽车服务中心","address":"北京市昌平区马池口镇下念头村北京市铁狮飞腾汽车服务中心","phone":"13466520667","workTime":"09:00-17:00","lat":40.193070110152306,"lng":116.20212711026537,"originalLng":116.195604,"originalLat":40.187175},{"name":"壳牌喜力汽车维修养护（八角店）","address":"北京市石景山区八角北路11号院底商壳牌喜力汽车维修养护（八角店）","phone":"13331027592","workTime":"09:00-17:00","lat":39.922724692546694,"lng":116.21124253641658,"originalLng":116.204674,"originalLat":39.916972},{"name":"东方嘉业汽车维修服务中心","address":"北京市顺义区高丽营镇清央学堂东方嘉业汽车维修服务中心","phone":"13810756204","workTime":"09:00-17:00","lat":40.15639212281392,"lng":116.52996717790298,"originalLng":116.523595,"originalLat":40.150052},{"name":"东创时尚方向车行","address":"北京市通州区科创五街九号（东创大厦西侧）","phone":"15145980095","workTime":"09:00-17:00","lat":39.81637189167282,"lng":116.55375921755568,"originalLng":116.547295,"originalLat":39.810329},{"name":"润泽汽车养护中心","address":"北京市昌平区马池口宏道村23号","phone":"18710238221","workTime":"09:00-17:00","lat":40.19759558041071,"lng":116.21113142138269,"originalLng":116.204556,"originalLat":40.191839},{"name":"盛奥通汽车服务有限公司回龙观分店","address":"北京市北京市昌平区回龙观太平庄北街东村家园南门东50米","phone":"13331101070","workTime":"09:00-17:00","lat":40.07031877061917,"lng":116.35231324833796,"originalLng":116.345712,"originalLat":40.064657},{"name":"澳北利达汽修","address":"北京市北京市海淀区宝盛里37号楼底商一层","phone":"13261220624","workTime":"09:00-17:00","lat":40.0383656870986,"lng":116.37385019316613,"originalLng":116.367345,"originalLat":40.032418},{"name":" 鑫向东汽车维修服务中心","address":"北京市延庆区延康路与康张路交叉口东120","phone":"13241051105","workTime":"09:00-18:00","lat":40.3978922997786,"lng":115.91455457006325,"originalLng":115.908164,"originalLat":40.391613},{"name":"北京甲森汽车服务有限公司","address":"北京市平谷区税务局红绿灯往北100米路东","phone":"13811062067","workTime":"08:00-17:00","lat":40.17409102959733,"lng":117.11804597653743,"originalLng":117.111674,"originalLat":40.167779},{"name":"北京仁合志成汽车修理厂","address":"北京市平谷区平谷镇平谷南街甲2号","phone":"13581763761","workTime":"09:00-18:00","lat":40.16000511870121,"lng":117.13809902724023,"originalLng":117.13171,"originalLat":40.153722},{"name":"长晟堂汽车生活馆（汉威国际广场店）","address":"北京市丰台区汉威国际广场4区7号楼B2车库长晟堂汽车","phone":"13521585600","workTime":"09:00-17:00","lat":39.82816173305205,"lng":116.30199081550829,"originalLng":116.295588,"originalLat":39.821928},{"name":"兄弟营汽车修理一站式服务中心","address":"北京市平谷区王辛庄镇平关路与齐王路交叉口西北260米","phone":"13911527603","workTime":"08:00-18:00","lat":40.171247641219026,"lng":117.10694162629623,"originalLng":117.100523,"originalLat":40.16507},{"name":"北京市国亚亚汽车修理有限责任公司","address":"北京市石景山区鲁谷路55号4幢","phone":"13691494824","workTime":"09:00-17:00","lat":39.909752284080106,"lng":116.22173380727595,"originalLng":116.215122,"originalLat":39.904091},{"name":"首方汽车服务有限公司","address":"北京市丰台区六里桥南里甲19号1幢地下一层009号","phone":"13126618978","workTime":"09:00-17:00","lat":39.88589767474694,"lng":116.31150161311422,"originalLng":116.305016,"originalLat":39.879802},{"name":"北京超飞汽车修理有限公司","address":"北京市大兴区礼贤镇大辛庄辛英街5号","phone":"13126916848","workTime":"08:00-18:00","lat":39.55601310600389,"lng":116.3557654882569,"originalLng":116.34917,"originalLat":39.550326},{"name":"换油中心","address":"北京市朝阳区王四营乡能链（大柳树加油站内）","phone":"18519655593","workTime":"09:00-17:00","lat":39.88018762731177,"lng":116.51615476440413,"originalLng":116.509739,"originalLat":39.873881},{"name":"北京世纪鸿运汽车服务有限公司","address":"北京市丰台区新发地潘家庙518号（新发地汽车综合性能检测站院内）","phone":"13910811105","workTime":"08:00-17:00","lat":39.83277980154121,"lng":116.35455941905644,"originalLng":116.347962,"originalLat":39.827103},{"name":"北京市东解顺汽车维修中心有限公司","address":"北京市顺义区牛栏山镇铁路西侧9号","phone":"13601113876","workTime":"09:00-17:00","lat":40.21786809766676,"lng":116.6543052971382,"originalLng":116.647905,"originalLat":40.211544},{"name":"京安驰汽车维修服务","address":"北京市顺义区高白路与四村北路一巷交叉口西南40米","phone":"18911005324","workTime":"09:00-17:00","lat":40.159877613999456,"lng":116.50532547095011,"originalLng":116.498892,"originalLat":40.153725},{"name":"北京市京宏汽车修理有限责任公司","address":"北京市顺义区G101","phone":"13910582938","workTime":"09:00-17:00","lat":40.1209807923701,"lng":116.57411668881217,"originalLng":116.567503,"originalLat":40.115252},{"name":"北京鸿鑫美容装饰","address":"北京市通州区宋庄镇烛光路烛光小区东南侧","phone":"15010637450","workTime":"09:00-17:00","lat":39.998005639915746,"lng":116.70222557021745,"originalLng":116.69559,"originalLat":39.99234},{"name":"禧克汽车俱乐部三里屯店","address":"北京市朝阳区工体北路13号世茂广场工三B2","phone":"17813226810","workTime":"09:00-17:00","lat":39.94367559106042,"lng":116.4564701061722,"originalLng":116.449884,"originalLat":39.937983},{"name":"途虎养车瑞都公园世家店","address":"北京市通州区梨园镇瑞都公园世家南区底商（停车费自理）","phone":"13910970671","workTime":"09:00-17:00","lat":39.869736620520804,"lng":116.68560946532415,"originalLng":116.679037,"originalLat":39.86389},{"name":"优锢嘉养车中心（超过15分钟停车会产生停车费需自理，6元/小时）","address":"北京市丰台区公益西桥华联商厦地库一层","phone":"18600115588","workTime":"09:00-17:00","lat":39.840301298657856,"lng":116.37590714678953,"originalLng":116.369409,"originalLat":39.834314},{"name":"北京车宜洁汽车服务","address":"北京市海淀区阜石路59号A区","phone":"18500455598","workTime":"09:00-17:00","lat":39.9327578533093,"lng":116.24510089916414,"originalLng":116.238552,"originalLat":39.926961},{"name":"德国马牌","address":"北京市朝阳区大郊亭北街珠江帝景B区北侧停车场院内，营业时间8：00-18：00","phone":"13611369375","workTime":"08:00-18:00","lat":39.89756473576875,"lng":116.48754139609903,"originalLng":116.480979,"originalLat":39.891721},{"name":"华信晟源汽车美容装饰中心1","address":"北京市北京市顺义区仁和镇河南村好梦情缘KTV旁边华信晟源汽车美容装饰中心","phone":"15701696603","workTime":"09:00-17:00","lat":40.11004680636927,"lng":116.7023754338931,"originalLng":116.69574,"originalLat":40.104382},{"name":"众车汇汽车维修（收费停车场内，费用需自理）","address":"北京市朝阳区红松路东坝南二街东泽园1号楼底商102-103汽车人家","phone":"13051800001","workTime":"09:00-17:00","lat":39.96609157334436,"lng":116.56541690266907,"originalLng":116.558863,"originalLat":39.960248},{"name":"富豪洗车人家","address":"北京市通州区宋庄镇富豪村南口中石化龙禹加油站背后地磅房旁边富豪洗车人家","phone":"17710134139","workTime":"09:00-17:00","lat":39.96486162264546,"lng":116.66546858046,"originalLng":116.659035,"originalLat":39.958672},{"name":"吉第汽车","address":"北京市西城区马甸吉第嘉园地下车库B2出口吉第汽车","phone":"13611275173","workTime":"09:00-17:00","lat":39.97138811439332,"lng":116.38556404331736,"originalLng":116.379114,"originalLat":39.965226},{"name":"易游恒通汽车技术服务有限公司","address":"北京市顺义区李桥镇龙塘路与机场东路交叉口路北易游恒通汽车技术服务有限公司","phone":"13370407261","workTime":"09:00-17:00","lat":40.06396781876226,"lng":116.64279149749942,"originalLng":116.636427,"originalLat":40.05763},{"name":"北京鹏旺靓达邓禄普轮胎专卖店","address":"北京市通州区玉桥中路110号","phone":"13717713886","workTime":"09:00-17:00","lat":39.899292820270084,"lng":116.68716236932345,"originalLng":116.680593,"originalLat":39.893475},{"name":"统一润滑油洗车店","address":"北京市朝阳区百子湾路27号燕鑫兆元加油站","phone":"13240718869","workTime":"09:00-17:00","lat":39.90669082787173,"lng":116.49071214502263,"originalLng":116.484177,"originalLat":39.900796},{"name":"金鼎洗车行","address":"北京市密云区鼓楼街道新东路36号金鼎洗车行","phone":"18232234529","workTime":"09:00-16:00","lat":40.395259561847155,"lng":116.86491728171706,"originalLng":116.858478,"originalLat":40.389112},{"name":"北京春来财汽车装饰用品销售部","address":"北京市北京市平谷区乐园西小区甲35号","phone":"15901293878","workTime":"09:00-16:00","lat":40.156838526959916,"lng":117.12107726257862,"originalLng":117.114703,"originalLat":40.150504},{"name":"建华余莉汽车装饰服务部","address":"北京市北京市海淀区颐和园路新建宫门路管理处西侧","phone":"13161181838","workTime":"09:00-17:00","lat":39.99794642812557,"lng":116.28839352498254,"originalLng":116.281994,"originalLat":39.991593},{"name":"奥德晟通汽车服务","address":"北京市北京市朝阳区十八里店后祈庄村67号","phone":"18610871455","workTime":"09:00-17:00","lat":39.84570559620918,"lng":116.48253810981656,"originalLng":116.475958,"originalLat":39.83994},{"name":"翼之行汽车服务","address":"北京市大兴区龙河路瑞康家园小区1号地库负一层翼之行汽车服务","phone":"18701464767","workTime":"09:00-17:00","lat":39.74560705729041,"lng":116.34840207480214,"originalLng":116.341767,"originalLat":39.739949},{"name":"翼之行汽车服务中心-御槐园店","address":"北京市丰台区南苑街道御槐园小区16号楼B1层","phone":"15582862690","workTime":"09:00-17:00","lat":39.822446172177536,"lng":116.38269769063353,"originalLng":116.376254,"originalLat":39.81634},{"name":"富豪洗车装饰店","address":"北京市北京市通州区宋庄镇富豪村656号","phone":"17610976307","workTime":"09:00-17:00","lat":39.96862608881343,"lng":116.66642538432345,"originalLng":116.659983,"originalLat":39.96245},{"name":"北京鑫雨广业汽车装饰中心","address":"北京市北京市延庆区石河营建材城北大4号","phone":"13910178075","workTime":"09:00-16:00","lat":40.476408137321734,"lng":116.00195811338139,"originalLng":115.995355,"originalLat":40.470643},{"name":"马甸经典家园地库洗车","address":"北京市朝阳区祁家豁子街8号","phone":"15501006296","workTime":"09:00-17:00 ","lat":39.98599603985628,"lng":116.38859600867009,"originalLng":116.382151,"originalLat":39.979783},{"name":"福润公司洗美中心","address":"北京市北京市延庆区北京福润汽车修理有限公司北门旁","phone":"13641058075","workTime":"09:00-16:00","lat":40.43975282176803,"lng":116.0077857971351,"originalLng":116.001238,"originalLat":40.433909},{"name":"H.D汽美俱乐部","address":"北京市朝阳区龙爪树241号H.D汽美俱乐部","phone":"18500029321","workTime":"09:00-17:00","lat":39.85158612274149,"lng":116.46292908697022,"originalLng":116.456306,"originalLat":39.845927},{"name":"云飞轮胎城（佳通轮胎）","address":"北京市通州区张家湾牌楼营云飞轮胎城","phone":"13911701198","workTime":"09:00-17:00","lat":39.83723568110778,"lng":116.70933021186048,"originalLng":116.70272,"originalLat":39.831585},{"name":"万寿路源达汽车养护中心","address":"北京市海淀区太平路25号源达汽车养护中心","phone":"13341158035","workTime":"09:00-17:00","lat":39.90668888475154,"lng":116.29474620153653,"originalLng":116.288355,"originalLat":39.900373},{"name":"北京金迪汽车美容","address":"北京市海淀区上地街道马连洼北路8号,万霖科技大厦地下停车场负2层","phone":"18737619619","workTime":"09:00-17:00","lat":40.03968370352883,"lng":116.30442718857745,"originalLng":116.29801,"originalLat":40.033483},{"name":"垂杨柳便民洗车","address":"北京市朝阳区双井街道垂杨柳北里1号楼对面停车场","phone":"19939137939","workTime":"09:00-17:00","lat":39.897498384286344,"lng":116.46704048284126,"originalLng":116.460413,"originalLat":39.891845},{"name":"天猫养车（精信汽修北大街店）","address":"北京市怀柔区小中富乐二区28号院","phone":"13693087060","workTime":"09:00-17:30","lat":40.34356438044297,"lng":116.64239445833827,"originalLng":116.635998,"originalLat":40.337217},{"name":"金鑫达汽车养护","address":"北京市通州区宋庄镇徐辛庄村美孚一号","phone":"13581611899","workTime":"09:00-17:00","lat":39.99191176963206,"lng":116.70217625941594,"originalLng":116.695541,"originalLat":39.986246},{"name":"闪电车管家-朝悦居店","address":"北京市朝阳区创达路61号蓝谷能源朝悦居站","phone":"13387605915","workTime":"09:00-17:00","lat":40.024911945136566,"lng":116.46915773339549,"originalLng":116.462538,"originalLat":40.019258},{"name":"清漪嘉缘汽车美容清洗","address":"北京市丰台区西罗园南里17号下南平房1号","phone":"15201051512","workTime":"09:00-17:00","lat":39.86166577023596,"lng":116.4005825439955,"originalLng":116.394183,"originalLat":39.855328},{"name":"嘉实多大兴商业街店","address":"北京市大兴区新安里甲41号楼1层18","phone":"18515281301","workTime":"09:00-17:00","lat":39.745270599839884,"lng":116.36257102547816,"originalLng":116.355975,"originalLat":39.739499},{"name":"丰体时代便民洗车店","address":"北京市北京市丰台区丰台区丰体时代大厦E座-底商途虎养车旁洗车店","phone":"18790165558","workTime":"09:00-17:00","lat":39.87223350617542,"lng":116.27698516940112,"originalLng":116.270572,"originalLat":39.86592},{"name":"轩雅汇养护式洗美中心","address":"北京市怀柔区怀耿路轩雅汇养护式洗美中心","phone":"13811815915","workTime":"09:00-16:00","lat":40.29349893507587,"lng":116.72275916466367,"originalLng":116.716198,"originalLat":40.287737},{"name":"北京泓源广凯汽车服务中心","address":"北京市顺义区李桥镇李天路58号","phone":"15910527276","workTime":"09:00-17:00","lat":40.04483263803279,"lng":116.67004880751861,"originalLng":116.663604,"originalLat":40.038723},{"name":"爱车行洗车美容服务部","address":"北京市丰台区宝隆路百姓大厨房院内爱车行洗车美容服务部","phone":"17710588856","workTime":"09:00-17:00","lat":39.83880249453881,"lng":116.3011531955163,"originalLng":116.294746,"originalLat":39.832555},{"name":"鹏润美车","address":"北京市平谷区平谷镇园田街南巷2排六号鹏润美车","phone":"15901594388","workTime":"09:00-16:00","lat":40.14234022883533,"lng":117.13907599162768,"originalLng":117.132667,"originalLat":40.136062},{"name":"北京海波汽车","address":"北京市通州区玉桥西路25号北京海波汽车","phone":"15313150987","workTime":"09:00-17:00","lat":39.90142977618645,"lng":116.67671076791156,"originalLng":116.670205,"originalLat":39.895432},{"name":"车韵园汽车美容","address":"北京市平谷区滨河居民小区29号楼1单元2号车韵园汽车美容","phone":"13910707782","workTime":"09:00-16:00","lat":40.13893758419746,"lng":117.11869240263432,"originalLng":117.112296,"originalLat":40.132612},{"name":"北京顺飞强汽车修理","address":"北京市北京市顺义区仁和镇河南村西门往北100米北京顺飞强汽车修理","phone":"13811016111","workTime":"09:00-17:00","lat":40.11488320693075,"lng":116.70259754456382,"originalLng":116.695961,"originalLat":40.109219},{"name":"友福汽车良乡店","address":"北京市房山区良乡月华大街太平庄东里1号友福汽车","phone":"15011296098","workTime":"09:00-17:00","lat":39.739317636787874,"lng":116.13118225547701,"originalLng":116.124637,"originalLat":39.73341},{"name":"门头沟加油猫","address":"北京市北京市门头沟区双峪桥北20米爱玛裕建材城西侧中国石油华石加油站后","phone":"13264098343","workTime":"09:00-17:00","lat":39.94318019323683,"lng":116.12121876135437,"originalLng":116.11465,"originalLat":39.937437},{"name":"车部落汽修洗车","address":"北京市北京市大兴区大兴区魏善庄镇东沙窝村北庞安路南","phone":"13701015672","workTime":"09:00-17:00","lat":39.62265961693093,"lng":116.41592790541863,"originalLng":116.409518,"originalLat":39.616348},{"name":"北京昌职汽车服务","address":"北京市昌平区北京昌职汽车服务有限公司","phone":"13811171610","workTime":"09:00-17:00","lat":40.15430169152095,"lng":116.30335915744064,"originalLng":116.296943,"originalLat":40.148084},{"name":"北京鑫德宝汽车服务有限公司","address":"北京市朝阳区红军营南路与秋实街交叉口西180米","phone":"13910061854","workTime":"09:00-17:00","lat":40.03938402771254,"lng":116.4273951852238,"originalLng":116.420962,"originalLat":40.033229},{"name":"北京嘉实多润滑油小屯路14号","address":"北京市北京市丰台区嘉实多润滑油养护中心北京市丰台区小屯路14号","phone":"13311358893","workTime":"09:00-17:00","lat":39.885292298020765,"lng":116.25993929682276,"originalLng":116.253444,"originalLat":39.879224},{"name":"张宽养车","address":"北京市东城区广渠家园11楼底下201","phone":"13811090223","workTime":"09:00-17:00","lat":39.898097258210846,"lng":116.45553446336389,"originalLng":116.448927,"originalLat":39.892387},{"name":"百晟养车","address":"北京市海淀区上庄镇沙阳路与辛力屯路十字路口向东500米路北","phone":"13269272737","workTime":"09:00-17:00","lat":40.13255412845141,"lng":116.18929417372642,"originalLng":116.182826,"originalLat":40.126422},{"name":"恒远汽车服务","address":"北京市怀柔区张自口村南10米","phone":"18511955802","workTime":"09:00-18:00","lat":40.30676925444841,"lng":116.69209998286128,"originalLng":116.685528,"originalLat":40.301029},{"name":"泊利行（北京）汽车服务有限公司","address":"北京市通州区土桥中街47号楼B座地库","phone":"13581579260","workTime":"09:00-17:00","lat":39.8768548770586,"lng":116.70074486313875,"originalLng":116.694112,"originalLat":39.871182},{"name":"车仕洁","address":"北京市怀柔区庙城镇高两河怡安园小区亿家华联超市停车场内","phone":"15117926261","workTime":"09:00-16:00","lat":40.29526037307553,"lng":116.65138941780772,"originalLng":116.645025,"originalLat":40.288929},{"name":"北京宝雷通祥汽车服务有限公司","address":"北京市房山区良乡文水家园1号1-25","phone":"13601396836","workTime":"09:00-17:00","lat":39.751510821286935,"lng":116.14469856061953,"originalLng":116.13823,"originalLat":39.745359},{"name":"北京鑫驰神网汽车装饰部","address":"北京市北京市怀柔区潘家园小区南2门西210米北京鑫驰神网汽车装饰部","phone":"13683580943","workTime":"09:00-16:00","lat":40.33574483792605,"lng":116.64177845724572,"originalLng":116.635387,"originalLat":40.329402},{"name":"北京中豪鹏达商贸有限公司","address":"北京市怀柔区乐园西大街15号院14号楼1层1单元14-7","phone":"18339601020","workTime":"09:00-16:00","lat":40.355664761113935,"lng":116.66461560202751,"originalLng":116.658167,"originalLat":40.349455},{"name":"北京嘉铭同创汽车装饰","address":"北京市门头沟区龙泉地区三温路与石担路联络线交叉口西北300米","phone":"15001234419","workTime":"09:00-17:00","lat":39.968792956733886,"lng":116.1116907694349,"originalLng":116.105072,"originalLat":39.963128},{"name":"建发洗车","address":"北京市房山区阎村镇大窦路开古庄村村委会南约200米","phone":"15901115219","workTime":"09:00-17:00","lat":39.709712231325824,"lng":116.06564895000685,"originalLng":116.059227,"originalLat":39.703531},{"name":"易捷汽车服务","address":"北京市朝阳区亮马桥路10号中石化加油站","phone":"13675583283","workTime":"09:00-17:00","lat":39.96204662968562,"lng":116.49087022426747,"originalLng":116.484339,"originalLat":39.95615},{"name":"车易捷汽车美容装饰服务(东花市店)","address":"北京市东城区东花市北里西区5号楼B1地下车场","phone":"15811090332","workTime":"09:00-17:00","lat":39.90523371132136,"lng":116.43702602087454,"originalLng":116.430522,"originalLat":39.899243},{"name":"优车客(达美中心店)","address":"北京市朝阳区青年路达美中心B3层","phone":"13261187990","workTime":"09:00-17:00","lat":39.945730002705595,"lng":116.52287250225267,"originalLng":116.516507,"originalLat":39.939392},{"name":"大龙洗车行","address":"北京市北京市延庆区延庆区延康路与汇通路交叉口南480米大龙洗车行","phone":"15011571562","workTime":"09:00-16:00","lat":40.37974890102598,"lng":115.89463595802061,"originalLng":115.888118,"originalLat":40.373781},{"name":"北京小石利诚洗车服务中心","address":"北京市北京市延庆区延庆镇京张路京西北加油站后院西北角小石洗车","phone":"13716510026","workTime":"09:00-16:00","lat":40.47016197290874,"lng":116.00433274073693,"originalLng":115.997742,"originalLat":40.464364},{"name":"北京酷改汽车装饰中心","address":"北京市北京市延庆区北京酷改汽车装饰中心延庆镇医孟路东格兰山水小区一期4号楼西门一期底商621室","phone":"13261330788","workTime":"09:00-16:00","lat":40.47265505233074,"lng":115.98021425533369,"originalLng":115.973581,"originalLat":40.466977},{"name":"安盛汽车维修有限公司","address":"北京市密云路滨河路14号","phone":"13810077581","workTime":"09:00-16:00","lat":40.39348000603284,"lng":116.85614102195855,"originalLng":116.849646,"originalLat":40.387489},{"name":"洪泰健康洗车","address":"北京市朝阳区小红门江南大厦地下二层洪泰健康洗车","phone":"13717973818","workTime":"09:00-17:00","lat":39.83660371202978,"lng":116.48036399593872,"originalLng":116.473783,"originalLat":39.830869},{"name":"鑫路泽汽修","address":"北京市北京市昌平区回龙观龙禧二街鑫路泽汽修","phone":"13520417234","workTime":"09:00-17:00","lat":40.089107482120276,"lng":116.32435296571732,"originalLng":116.317802,"originalLat":40.083245},{"name":"其强汽修","address":"北京市北京市房山区杨庄子小区北门东80米","phone":"15711031079","workTime":"09:00-17:00","lat":39.76220541621996,"lng":116.2246034167565,"originalLng":116.217967,"originalLat":39.756546},{"name":"院内停车场洗车","address":"北京市朝阳区太阳宫顺景园(曙光西路南)停车场内","phone":"18910209783","workTime":"09:00-17:00","lat":39.9793214131339,"lng":116.46769114616554,"originalLng":116.461059,"originalLat":39.973666},{"name":"丽源维修救援洗车","address":"北京市丰台区丽源路56号","phone":"13718754678","workTime":"09:00-17:00","lat":39.881092834704454,"lng":116.32358221173594,"originalLng":116.317021,"originalLat":39.875212},{"name":"小园便民洗车","address":"北京市门头沟区平安西路与上园路交叉口西220米","phone":"13911365617","workTime":"09:00-18:00","lat":39.90352761492417,"lng":116.12488101854802,"originalLng":116.11831,"originalLat":39.897727},{"name":"优车客宝隆大厦店","address":"北京市丰台区玉泉营宝隆大厦B2洗车店","phone":"13691381012","workTime":"09:00-17:00","lat":39.85532808927213,"lng":116.33851409897409,"originalLng":116.331896,"originalLat":39.849643},{"name":"星东壹公里汽车美容会所","address":"北京市怀柔区星东天地生活购物广场星东壹公里汽车美容会所","phone":"15010667243","workTime":"09:00-16:00","lat":40.329716932352376,"lng":116.65889636942491,"originalLng":116.652489,"originalLat":40.323438},{"name":"北京名途汽车服务有限公司","address":"北京市朝阳区黑庄户乡大鲁店北路二号4号楼1层102","phone":"13331178297","workTime":"09:00-17:00","lat":39.852280668520244,"lng":116.58060608241901,"originalLng":116.573986,"originalLat":39.846611},{"name":"乐福汽车服务","address":"北京市朝阳区红坊路6号红绿灯路口南","phone":"18611419191","workTime":"09:00-17:00","lat":39.83051474120169,"lng":116.48160578135706,"originalLng":116.475035,"originalLat":39.824766},{"name":"洗来福汽车养护","address":"北京市北京市朝阳区武圣北路与八颗杨北街交叉路口洗来福汽车养护","phone":"13552510725","workTime":"09:00-17:00","lat":39.89775275036827,"lng":116.47336092341688,"originalLng":116.466741,"originalLat":39.892078},{"name":"阳光洗车(北京市通州区马驹桥店) ","address":"北京市通州区西周路光华园对面","phone":"13716455188","workTime":"09:00-17:00","lat":39.75719437841208,"lng":116.56348819563506,"originalLng":116.556927,"originalLat":39.751312},{"name":"北京市酷车族汽车装饰中心","address":"北京市通州区玉桥中路118号","phone":"13691269867","workTime":"09:00-17:00","lat":39.894605705716636,"lng":116.68805211808106,"originalLng":116.681474,"originalLat":39.8888},{"name":"北京汤姆汽车服务中心","address":"北京市北京市丰台区东铁匠营横一条31号金泰彤翔写字楼A座底商","phone":"13641067435","workTime":"09:00-17:00","lat":39.854522552945205,"lng":116.44175951089203,"originalLng":116.435219,"originalLat":39.848614},{"name":"双明洗车店","address":"北京市房山区良三路饮料厂家属楼东北60米","phone":"18701355041","workTime":"09:00-17:00","lat":39.771577281728874,"lng":116.14968585425065,"originalLng":116.143249,"originalLat":39.76535},{"name":"朗丽兹西山温泉洗车房","address":"北京市北京市海淀区丰滢东路永捷南路路北口朗丽兹西山温泉东北角","phone":"13693633734","workTime":"09:00-17:00","lat":40.07415127720127,"lng":116.25747276778809,"originalLng":116.25099,"originalLat":40.068137},{"name":"宏泰汽车","address":"北京市北京市朝阳区红军营东路北苑中街11-15号","phone":"15313281016","workTime":"09:00-17:00","lat":40.03495388826452,"lng":116.44406444536044,"originalLng":116.437527,"originalLat":40.029091},{"name":"万科丰科中心洗车（停车费自理）","address":"北京市丰台区汽车博物馆东路丰科中心地下停车场B2层","phone":"15611366613","workTime":"09:00-17:00","lat":39.8354489284771,"lng":116.31128502482726,"originalLng":116.304827,"originalLat":39.829359},{"name":"诚意顺达东区","address":"北京市大兴区康庄路诚意顺达汽车修理厂-东区","phone":"13691453259","workTime":"09:00-17:00","lat":39.764909601563076,"lng":116.34910103306811,"originalLng":116.342466,"originalLat":39.75925},{"name":"北京通达兴盛旺汽车装饰","address":"北京市平谷区平谷南街39号院","phone":"13381120251","workTime":"09:00-16:00","lat":40.16091266220223,"lng":117.11775850348333,"originalLng":117.11138,"originalLat":40.154601},{"name":"奔宝奥汽车服务中心","address":"北京市通州区九棵树中路150号","phone":"13011197475","workTime":"09:00-17:00","lat":39.88030576069748,"lng":116.66433058835604,"originalLng":116.657883,"originalLat":39.874092},{"name":"洁顺达汽车服务中心","address":"北京市顺义区马坡顺丰大街16号院北门对面","phone":"15600269666","workTime":"09:00-17:00","lat":40.19344594358098,"lng":116.65419860605272,"originalLng":116.647821,"originalLat":40.187129},{"name":"凯旋城洗车店","address":"北京市朝阳区北苑路170号7号楼B2停车场从北门地库入口","phone":"13552858679","workTime":"09:00-17:00","lat":40.003024509601666,"lng":116.42647078865912,"originalLng":116.420013,"originalLat":39.996844},{"name":"众鑫汇星汽车美容养护中心","address":"北京市通州区次渠定海园新城商厦地下一层","phone":"13520670025","workTime":"09:00-17:00","lat":39.804805225284625,"lng":116.57228561309122,"originalLng":116.565714,"originalLat":39.799067},{"name":"北京翡翠香园汽车用品销售中心","address":"北京市大兴区高米店镇兴盛街82号","phone":"13910705340","workTime":"09:00-17:00","lat":39.7781948556013,"lng":116.32341035849629,"originalLng":116.316861,"originalLat":39.772315},{"name":"华源一里汽车美容","address":"北京市丰台区华源一里八号院南门小区内","phone":"18511710692","workTime":"09:00-17:00","lat":39.885828485616074,"lng":116.32245581161914,"originalLng":116.315903,"originalLat":39.879929},{"name":"车鲁班一站式洗车服务中心","address":"北京市延庆区延庆镇司家营村82号","phone":"13718039708","workTime":"09:00-17:00","lat":40.44945442479007,"lng":115.99838264530705,"originalLng":115.99178,"originalLat":40.443737},{"name":"闪电汽车美容","address":"北京市北京市朝阳区小红门桥北小红门路和郭家庄路交叉口（拓凯品牌运营总部）","phone":"18600740928","workTime":"09:00-17:00","lat":39.84242425899261,"lng":116.46471873852867,"originalLng":116.458103,"originalLat":39.836773},{"name":"车匠汽车维修养护","address":"北京市北京市昌平区昌平区昌平路380号院2号","phone":"18407125163","workTime":"09:00-17:00","lat":40.073732916827915,"lng":116.3277633907445,"originalLng":116.321208,"originalLat":40.06793},{"name":"君贤洗车中心","address":"北京市延庆区李四官庄8块地6号楼102室","phone":"13641147470","workTime":"09:00-16:00","lat":40.437973744162164,"lng":115.96823508368962,"originalLng":115.961673,"originalLat":40.432176},{"name":"北京丽宝波尔洗车","address":"北京市怀柔区916汽车总站对面后城街大院旁","phone":"15001252728","workTime":"09:00-17:00","lat":40.323854379750166,"lng":116.65375349980799,"originalLng":116.647368,"originalLat":40.317531},{"name":"速洁汽车商贸","address":"北京市朝阳区建国路338号华汇大厦B座（提前100米右转从停车场入口进入护路墙内）速洁汽车商贸","phone":"15333198606","workTime":"09:00-17:00","lat":39.91454960960542,"lng":116.55723844541373,"originalLng":116.550742,"originalLat":39.908566},{"name":"天福德式精养","address":"北京市房山区良乡时尚家园底商天福德式精养","phone":"13311576991","workTime":"09:00-17:00","lat":39.74562215020134,"lng":116.14375277061916,"originalLng":116.137281,"originalLat":39.739487},{"name":"南海汽车装饰","address":"北京市大兴区瀛海镇鹿海园五里北门东侧底商","phone":"13521753669","workTime":"09:00-17:00","lat":39.765680241055854,"lng":116.50663403617585,"originalLng":116.500178,"originalLat":39.759497},{"name":"靓e族汽车洗美","address":"北京市朝阳区三间房乡乐栋300号","phone":"18301513985","workTime":"09:00-17:00","lat":39.912006251291544,"lng":116.57200140648735,"originalLng":116.565421,"originalLat":39.906261},{"name":"中阳大厦洗车美容中心","address":"北京市丰台区菜户营南路139号中阳大厦院内","phone":"18338117830","workTime":"09:00-17:00","lat":39.86651197440627,"lng":116.35333007953726,"originalLng":116.346701,"originalLat":39.860834},{"name":"冠京顺达洗车中心","address":"北京市丰台区丰北路79号冠京饭店(地下一层)","phone":"13120446999","workTime":"09:00-17:00","lat":39.87379851451023,"lng":116.3002802572722,"originalLng":116.293851,"originalLat":39.867531},{"name":"玲珑轮胎","address":"北京市北京市密云区城后街滨阳西里小区北侧约250米玲珑轮胎","phone":"13911392752","workTime":"09:00-16:00","lat":40.389541282023224,"lng":116.86521595095158,"originalLng":116.858773,"originalLat":40.383387},{"name":"润天汽修洗车","address":"北京市海淀区永定路28号1栋北平房（老边饺子馆永定路店旁边）","phone":"13651164031","workTime":"09:00-17:00","lat":39.92623087604462,"lng":116.27162095834764,"originalLng":116.265223,"originalLat":39.919987},{"name":"北京洛荣汽车用品","address":"北京市密云区行宫街39-3北京洛荣汽车用品","phone":"13811752200","workTime":"09:00-16:00","lat":40.393165362799984,"lng":116.8687334519672,"originalLng":116.862313,"originalLat":40.386957},{"name":"洗车补胎小修","address":"北京市东城区景泰西里西区15号楼下","phone":"13520749100","workTime":"09:00-17:00","lat":39.86873731810977,"lng":116.41501880688172,"originalLng":116.408609,"originalLat":39.862417},{"name":"北京怀柔地税洗车房","address":"北京市北京市怀柔区地税对面洗车院内南华大街与青春路交叉口南20米","phone":"13241569007","workTime":"09:00-16:00","lat":40.314717169151855,"lng":116.63789104020343,"originalLng":116.631511,"originalLat":40.308405},{"name":"京熙汽车美容","address":"北京市丰台区西五里店56号院","phone":"13601014041","workTime":"09:00-17:00","lat":39.86312325462685,"lng":116.25636174203994,"originalLng":116.249846,"originalLat":39.857121},{"name":"L9美车行","address":"北京市海淀区阜成路三十号院东楼旁","phone":"15300096630","workTime":"09:00-17:00","lat":39.92766687771478,"lng":116.30777648763451,"originalLng":116.301346,"originalLat":39.92152},{"name":"洗车小匠","address":"北京市朝阳区望京西路41号院金隅国际地下停车场B1层","phone":"13552349086","workTime":"09:00-18:00","lat":39.99362811878194,"lng":116.4663507591019,"originalLng":116.459712,"originalLat":39.987971},{"name":"联成祥云","address":"北京市北京市房山区窦店镇于庄村物廉冠超市对面","phone":"13657127615","workTime":"09:00-17:00","lat":39.68197059933302,"lng":116.07646381554693,"originalLng":116.069978,"originalLat":39.675975},{"name":"驿丰源汽车服务中心","address":"北京市朝阳区容慧路1号院15号楼一层01内1-2号","phone":"13552067919","workTime":"09:00-17:00","lat":40.03593428495509,"lng":116.50259572765721,"originalLng":116.496143,"originalLat":40.029827},{"name":"北京小方汽车服务","address":"北京市大兴区盛达街与民顺北路交叉口西100米","phone":"17333605029","workTime":"09:00-17:00","lat":39.725100508543555,"lng":116.40197477577838,"originalLng":116.395592,"originalLat":39.718761},{"name":"爱尚洗车美容","address":"北京市朝阳区来广营来鹏高尔夫球场爱尚洗车美容","phone":"13488690467","workTime":"09:00-17:00","lat":40.03441533466928,"lng":116.46935546967116,"originalLng":116.462745,"originalLat":40.028764},{"name":"净净汽车美容装饰中心","address":"北京市房山区阎村镇前沿村村西口","phone":"18911742215","workTime":"09:00-17:00","lat":39.73247312189407,"lng":116.10156262557685,"originalLng":116.094941,"originalLat":39.726807},{"name":"车友汇洗车城","address":"北京市丰台区万丰路305号亿潼隆万丰购物中心停车场南侧洗车房","phone":"13161663189","workTime":"09:00-17:00","lat":39.87901503472018,"lng":116.30235227971248,"originalLng":116.295914,"originalLat":39.872774},{"name":"关东店北街停车场院内便民洗车","address":"北京市朝阳区关东店北街11号","phone":"13552018785","workTime":"09:00-17:00","lat":39.92863780663564,"lng":116.46444034317574,"originalLng":116.457839,"originalLat":39.922991},{"name":"北京兴利军商贸有限公司","address":"北京市昌平区常兴庄常后路底商123号北京兴利军商贸有限公司","phone":"13520079951","workTime":"09:00-17:00","lat":40.182778350452914,"lng":116.4265576901521,"originalLng":116.420135,"originalLat":40.176612},{"name":"华澳便民洗车房","address":"北京市海淀区紫竹院路华澳中心B4地下停车场地下4层华澳便民洗车房","phone":"17695428388","workTime":"09:00-17:00","lat":39.95073485172144,"lng":116.31229345260387,"originalLng":116.305833,"originalLat":39.944664},{"name":"北京美通汽车维修服务中心","address":"北京市丰台区西四环75-2北京美通汽车维修中心院内","phone":"13811944378","workTime":"09:00-17:00","lat":39.90035902322685,"lng":116.28009458638526,"originalLng":116.273702,"originalLat":39.894027},{"name":"北京金威昊","address":"北京市北京市西城区北京西城区广安门外南街18号","phone":"13718257971","workTime":"09:00-17:00","lat":39.89145075436732,"lng":116.35465206679996,"originalLng":116.34803,"originalLat":39.885765},{"name":"北京乐之家汽车服务有限公司","address":"北京市北京市海淀区北京乐之家汽车服务有限公司八家嘉园22号楼2单元B2层","phone":"13011809775","workTime":"09:00-17:00","lat":40.0213628398056,"lng":116.34999240000059,"originalLng":116.34337,"originalLat":40.015705},{"name":"HY洗车美容装饰中心","address":"北京市朝阳区上汽通用田宇行兴别克销售服务中心院内","phone":"18810151609","workTime":"09:00-17:00","lat":39.84366696811782,"lng":116.4716414225879,"originalLng":116.465028,"originalLat":39.838005}];
+
+        let map = null;
+        let myLocation = null;
+        let nearestShop = null;
+        let markers = [];
+
+        // API 配置
+        const API_URL = 'https://chfwb.meiqitc.com/mqh5svr/serviceStore/byAddressDis';
+        const API_PARAMS = {
+            storeName: "",
+            lng: 116.407526,
+            lat: 39.904030,
+            searchUp: 1,
+            saleChannelNo: "ECPIC",
+            branchCode: "1010100",
+            provinceName: "北京市",
+            cityName: "北京市",
+            countyName: "",
+            serviceType: "01",
+            subServiceType: "0104",
+            orderFlag: 1
+        };
+
+        // 初始化地图
+        function initMap() {
+            // 创建地图实例（默认北京市中心）
+            map = new BMap.Map("map");
+            const point = new BMap.Point(116.407526, 39.904030);
+            map.centerAndZoom(point, 12);
+            map.enableScrollWheelZoom(true);
+
+            // 获取当前位置
+            getCurrentLocation();
+        }
+
+        // GCJ-02 转 BD-09 坐标（火星坐标转百度坐标）
+        function gcj02ToBd09(lng, lat) {
+            const pi = 3.14159265358979324;
+            const x_pi = (pi * 3000.0) / 180.0;
+
+            const z = Math.sqrt(lng * lng + lat * lat) + 0.00002 * Math.sin(lat * x_pi);
+            const theta = Math.atan2(lat, lng) + 0.000003 * Math.cos(lng * x_pi);
+            const bdLng = z * Math.cos(theta) + 0.0065;
+            const bdLat = z * Math.sin(theta) + 0.006;
+
+            return {lng: bdLng, lat: bdLat};
+        }
+
+        // WGS-84 转 BD-09 坐标（GPS坐标转百度坐标）
+        function wgs84ToBd09(lng, lat) {
+            const pi = 3.14159265358979324;
+            const x_pi = (pi * 3000.0) / 180.0;
+
+            // WGS-84 转 GCJ-02
+            let dlat = transformLat(lng - 105.0, lat - 35.0);
+            let dlng = transformLng(lng - 105.0, lat - 35.0);
+            const radlat = lat / 180.0 * pi;
+            let magic = Math.sin(radlat);
+            magic = 1 - 0.00669342162296594323 * magic * magic;
+            const sqrtmagic = Math.sqrt(magic);
+            dlat = (dlat * 180.0) / ((6335552.717000426 / magic / sqrtmagic) * pi);
+            dlng = (dlng * 180.0) / (6378245.0 / sqrtmagic * Math.cos(radlat) * pi);
+            const gcjLat = lat + dlat;
+            const gcjLng = lng + dlng;
+
+            // GCJ-02 转 BD-09
+            const z = Math.sqrt(gcjLng * gcjLng + gcjLat * gcjLat) + 0.00002 * Math.sin(gcjLat * x_pi);
+            const theta = Math.atan2(gcjLat, gcjLng) + 0.000003 * Math.cos(gcjLng * x_pi);
+            const bdLng = z * Math.cos(theta) + 0.0065;
+            const bdLat = z * Math.sin(theta) + 0.006;
+
+            return {lng: bdLng, lat: bdLat};
+        }
+
+        function transformLat(lng, lat) {
+            let ret = -100.0 + 2.0 * lng + 3.0 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+            ret += (20.0 * Math.sin(6.0 * lng * Math.PI) + 20.0 * Math.sin(2.0 * lng * Math.PI)) * 2.0 / 3.0;
+            ret += (20.0 * Math.sin(lat * Math.PI) + 40.0 * Math.sin(lat / 3.0 * Math.PI)) * 2.0 / 3.0;
+            ret += (160.0 * Math.sin(lat / 12.0 * Math.PI) + 320 * Math.sin(lat * Math.PI / 30.0)) * 2.0 / 3.0;
+            return ret;
+        }
+
+        function transformLng(lng, lat) {
+            let ret = 300.0 + lng + 2.0 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+            ret += (20.0 * Math.sin(6.0 * lng * Math.PI) + 20.0 * Math.sin(2.0 * lng * Math.PI)) * 2.0 / 3.0;
+            ret += (20.0 * Math.sin(lng * Math.PI) + 40.0 * Math.sin(lng / 3.0 * Math.PI)) * 2.0 / 3.0;
+            ret += (150.0 * Math.sin(lng / 12.0 * Math.PI) + 300.0 * Math.sin(lng / 30.0 * Math.PI)) * 2.0 / 3.0;
+            return ret;
+        }
+
+        // 获取当前位置
+        function getCurrentLocation() {
+            // 使用浏览器原生 Geolocation API（iOS Safari 更稳定）
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        // GPS坐标（WGS-84）转百度坐标（BD-09）
+                        const bdCoords = wgs84ToBd09(position.coords.longitude, position.coords.latitude);
+
+                        myLocation = {
+                            lat: bdCoords.lat,
+                            lng: bdCoords.lng
+                        };
+
+                        // 添加当前位置标记
+                        const myMarker = new BMap.Marker(new BMap.Point(myLocation.lng, myLocation.lat), {
+                            icon: new BMap.Icon(
+                                'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTUiIGN5PSIxNSIgcj0iMTAiIGZpbGw9IiMxOTg5ZmEiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMyIvPjwvc3ZnPg==',
+                                new BMap.Size(30, 30)
+                            )
+                        });
+                        map.addOverlay(myMarker);
+                        map.centerAndZoom(new BMap.Point(myLocation.lng, myLocation.lat), 14);
+
+                        // 显示商家标记
+                        showShops();
+                        document.getElementById('loading').classList.add('hidden');
+                    },
+                    function(error) {
+                        console.error('定位失败:', error);
+                        let errorMsg = '⚠️ 定位失败';
+
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMsg = '⚠️ 请允许位置权限';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMsg = '⚠️ 位置信息不可用';
+                                break;
+                            case error.TIMEOUT:
+                                errorMsg = '⚠️ 定位超时';
+                                break;
+                        }
+
+                        document.getElementById('infoText').innerHTML = errorMsg + '，显示全部商家';
+                        showShops();
+                        document.getElementById('loading').classList.add('hidden');
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                document.getElementById('infoText').innerHTML = '⚠️ 浏览器不支持定位';
+                showShops();
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        // 显示商家标记
+        function showShops() {
+            // 清除旧标记
+            markers.forEach(marker => map.removeOverlay(marker));
+            markers = [];
+
+            // 计算距离并排序
+            let sortedShops = shops.map(shop => {
+                if (myLocation) {
+                    const distance = calculateDistance(
+                        myLocation.lat,
+                        myLocation.lng,
+                        shop.lat,
+                        shop.lng
+                    );
+                    return { ...shop, distance };
+                }
+                return { ...shop, distance: 0 };
+            }).sort((a, b) => a.distance - b.distance);
+
+            nearestShop = sortedShops[0];
+
+            // 更新信息
+            if (myLocation) {
+                document.getElementById('infoText').innerHTML =
+                    `📍 最近: <strong>${nearestShop.name}</strong> (${formatDistance(nearestShop.distance)})`;
+            } else {
+                document.getElementById('infoText').innerHTML = `共 ${shops.length} 家洗车店`;
+            }
+
+            // 添加商家标记
+            sortedShops.forEach((shop, index) => {
+                const point = new BMap.Point(shop.lng, shop.lat);
+
+                // 最近的用红色标记，其他用蓝色
+                const isNearest = index === 0 && myLocation;
+                const marker = new BMap.Marker(point, {
+                    icon: new BMap.Icon(
+                        `data:image/svg+xml;base64,${isNearest ?
+                            'PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTE1IDAgQzYuNyAwIDAgNi43IDAgMTUgQzAgMjMuMyAxNSA0MCAxNSA0MCBTMzAgMjMuMyAzMCAxNSBDMzAgNi43IDIzLjMgMCAxNSAwIFogTTE1IDIwIEMxMi4yIDIwIDEwIDE3LjggMTAgMTUgQzEwIDEyLjIgMTIuMiAxMCAxNSAxMCBDMTcuOCAxMCAyMCAxMi4yIDIwIDE1IEMyMCAxNy44IDE3LjggMjAgMTUgMjAgWiIgZmlsbD0iI2ZmNDQ0NCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+'
+                            :
+                            'PHN2ZyB3aWR0aD0iMzAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTE1IDAgQzYuNyAwIDAgNi43IDAgMTUgQzAgMjMuMyAxNSA0MCAxNSA0MCBTMzAgMjMuMyAzMCAxNSBDMzAgNi43IDIzLjMgMCAxNSAwIFogTTE1IDIwIEMxMi4yIDIwIDEwIDE3LjggMTAgMTUgQzEwIDEyLjIgMTIuMiAxMCAxNSAxMCBDMTcuOCAxMCAyMCAxMi4yIDIwIDE1IEMyMCAxNy44IDE3LjggMjAgMTUgMjAgWiIgZmlsbD0iIzE5ODlmYSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+'
+                        }`,
+                        new BMap.Size(30, 40),
+                        { anchor: new BMap.Size(15, 40) }
+                    )
+                });
+
+                // 添加信息窗口
+                const infoWindow = new BMap.InfoWindow(
+                    `<div style="padding:10px;">
+                        <h3 style="margin:0 0 8px 0;font-size:16px;">${shop.name}</h3>
+                        <p style="margin:4px 0;font-size:14px;color:#666;">📍 ${shop.address}</p>
+                        ${shop.phone ? `<p style="margin:4px 0;font-size:14px;"><a href="tel:${shop.phone}" style="color:#00A870;text-decoration:none;font-weight:500;">📞 ${shop.phone}</a></p>` : ''}
+                        ${shop.workTime ? `<p style="margin:4px 0;font-size:14px;color:#666;">⏰ ${shop.workTime}</p>` : ''}
+                        ${myLocation ? `<p style="margin:4px 0;font-size:14px;color:#1989fa;font-weight:500;">📏 ${formatDistance(shop.distance)}</p>` : ''}
+                        <div style="margin-top:10px;display:flex;gap:8px;">
+                            <button onclick="navigateTo(${shop.lat}, ${shop.lng}, '${shop.name.replace(/'/g, "\\'")}', 'amap')" style="flex:1;padding:8px;background:#00A870;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">🧭 高德导航</button>
+                            <button onclick="navigateTo(${shop.lat}, ${shop.lng}, '${shop.name.replace(/'/g, "\\'")}', 'baidu')" style="flex:1;padding:8px;background:#1989fa;color:white;border:none;border-radius:6px;font-size:13px;font-weight:500;">🧭 百度导航</button>
+                        </div>
+                        ${myLocation ? `<button onclick="showRouteTo(${shop.lat}, ${shop.lng}, '${shop.name.replace(/'/g, "\\'")}')" style="width:100%;margin-top:8px;padding:8px;background:#f5f5f5;color:#333;border:1px solid #ddd;border-radius:6px;font-size:13px;font-weight:500;">🗺️ 显示路线</button>` : ''}
+                    </div>`,
+                    { width: 280, height: 0 }
+                );
+
+                marker.addEventListener('click', function() {
+                    map.openInfoWindow(infoWindow, point);
+                });
+
+                map.addOverlay(marker);
+                markers.push(marker);
+            });
+        }
+
+        // 导航到指定商家
+        function navigateTo(lat, lng, name, type) {
+            if (type === 'amap') {
+                // 高德地图
+                window.location.href = `https://uri.amap.com/navigation?to=${lng},${lat}&toname=${encodeURIComponent(name)}&mode=car&policy=1&src=carwash`;
+            } else {
+                // 百度地图
+                window.location.href = `baidumap://map/direction?destination=${lat},${lng}&destination_name=${encodeURIComponent(name)}&coord_type=gcj02&mode=driving&src=carwash`;
+            }
+        }
+
+        // 在地图上显示路线
+        let currentDriving = null; // 保存当前路线规划实例
+        function showRouteTo(destLat, destLng, shopName) {
+            if (!myLocation) {
+                return;
+            }
+
+            // 清除之前的路线
+            if (currentDriving) {
+                currentDriving.clearResults();
+            }
+
+            // 显示加载状态
+            document.getElementById('infoText').innerHTML = '🔍 正在规划路线...';
+
+            // 创建驾车路线规划
+            currentDriving = new BMap.DrivingRoute(map, {
+                renderOptions: {
+                    map: map,
+                    autoViewport: true,
+                    enableDragging: false
+                },
+                onSearchComplete: function(results) {
+                    if (currentDriving.getStatus() === BMAP_STATUS_SUCCESS) {
+                        const plan = results.getPlan(0);
+
+                        // 获取路线信息
+                        const distance = (plan.getDistance(false) / 1000).toFixed(1);
+                        const duration = Math.ceil(plan.getDuration(false) / 60);
+
+                        // 获取红绿灯数量（API直接返回）
+                        const trafficLights = plan.getNumTrafficLights ? plan.getNumTrafficLights() : 0;
+
+                        // 更新顶部信息栏
+                        const infoHtml = `
+                            <div style="display:flex;align-items:center;gap:12px;">
+                                <span style="font-size:14px;font-weight:600;">🚗 前往: ${shopName || '目的地'}</span>
+                            </div>
+                            <div style="display:flex;gap:16px;margin-top:6px;font-size:13px;color:#666;">
+                                <span>📏 <strong>${distance}</strong> 公里</span>
+                                <span>⏱️ 约 <strong>${duration}</strong> 分钟</span>
+                                ${trafficLights > 0 ? `<span>🚦 <strong>${trafficLights}</strong> 个红绿灯</span>` : ''}
+                            </div>
+                        `;
+                        document.getElementById('infoText').innerHTML = infoHtml;
+
+                        // 显示取消路线按钮
+                        document.getElementById('cancelRouteBtn').classList.remove('hidden');
+                    } else {
+                        document.getElementById('infoText').innerHTML = '⚠️ 路线规划失败';
+                    }
+                },
+                onMarkersSet: function(routes) {
+                    // 路线标记设置完成
+                }
+            });
+
+            // 规划路线
+            const start = new BMap.Point(myLocation.lng, myLocation.lat);
+            const end = new BMap.Point(destLng, destLat);
+            currentDriving.search(start, end);
+        }
+
+        // 取消路线
+        function cancelRoute() {
+            if (currentDriving) {
+                currentDriving.clearResults();
+                currentDriving = null;
+            }
+
+            // 隐藏取消按钮
+            document.getElementById('cancelRouteBtn').classList.add('hidden');
+
+            // 恢复显示最近的商家信息
+            if (nearestShop && myLocation) {
+                document.getElementById('infoText').innerHTML =
+                    `📍 最近: <strong>${nearestShop.name}</strong> (${formatDistance(nearestShop.distance)})`;
+            } else {
+                document.getElementById('infoText').innerHTML = `共 ${shops.length} 家洗车店`;
+            }
+        }
+
+        // 计算距离
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // 格式化距离
+        function formatDistance(km) {
+            if (km < 1) {
+                return Math.round(km * 1000) + '米';
+            }
+            return km.toFixed(1) + '公里';
+        }
+
+        // 对比商家数据，检测变化
+        function compareShops(oldShops, newShops) {
+            const oldMap = new Map(oldShops.map(s => [s.name, s]));
+            const newMap = new Map(newShops.map(s => [s.name, s]));
+
+            const added = [];      // 新增的商家
+            const removed = [];    // 移除的商家
+            const updated = [];    // 信息更新的商家
+
+            // 检查新增和更新
+            newShops.forEach(newShop => {
+                const oldShop = oldMap.get(newShop.name);
+                if (!oldShop) {
+                    added.push(newShop);
+                } else {
+                    // 检查是否有信息变化
+                    if (oldShop.address !== newShop.address ||
+                        oldShop.phone !== newShop.phone ||
+                        oldShop.workTime !== newShop.workTime ||
+                        oldShop.lat !== newShop.lat ||
+                        oldShop.lng !== newShop.lng) {
+                        updated.push({
+                            name: newShop.name,
+                            old: oldShop,
+                            new: newShop
+                        });
+                    }
+                }
+            });
+
+            // 检查移除
+            oldShops.forEach(oldShop => {
+                if (!newMap.has(oldShop.name)) {
+                    removed.push(oldShop);
+                }
+            });
+
+            return { added, removed, updated };
+        }
+
+        // 刷新商家数据
+        async function refreshShops() {
+            const btn = document.getElementById('refreshBtn');
+            const loading = document.getElementById('loading');
+
+            try {
+                // 禁用按钮
+                btn.disabled = true;
+                btn.textContent = '🔄 检查更新...';
+                loading.classList.remove('hidden');
+
+                // 获取所有页面的数据
+                const allShops = [];
+                let page = 1;
+                const limit = 10;
+
+                while (true) {
+                    const params = { ...API_PARAMS, page, limit };
+
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json, text/plain, */*',
+                            'Accept-Language': 'zh-CN,zh;q=0.9',
+                            'Content-Type': 'application/json;charset=UTF-8',
+                            'Origin': 'https://chfwb.meiqitc.com',
+                            'Referer': 'https://chfwb.meiqitc.com/mqstatic/1010100/',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify(params)
+                    });
+
+                    const data = await response.json();
+
+                    if (data.code !== '0' || !data.data?.data || data.data.data.length === 0) {
+                        break;
+                    }
+
+                    // 处理商家数据
+                    data.data.data.forEach(shop => {
+                        const [lng, lat] = (shop.lonLat || ',').split(',').map(Number);
+                        // 将 GCJ-02 坐标转换为 BD-09 坐标
+                        const bdCoords = gcj02ToBd09(lng, lat);
+                        allShops.push({
+                            name: shop.storeName || '',
+                            address: shop.address || '',
+                            phone: shop.phone || '',
+                            workTime: shop.storeBusinessTime || shop.businessTime || '',
+                            lat: bdCoords.lat,
+                            lng: bdCoords.lng
+                        });
+                    });
+
+                    if (data.data.data.length < limit) {
+                        break;
+                    }
+
+                    page++;
+                }
+
+                if (allShops.length > 0) {
+                    // 对比数据
+                    const changes = compareShops(shops, allShops);
+                    const hasChanges = changes.added.length > 0 ||
+                                      changes.removed.length > 0 ||
+                                      changes.updated.length > 0;
+
+                    // 显示对比结果
+                    let message = `📊 数据对比结果：\n\n`;
+                    message += `当前数据：${shops.length} 家\n`;
+                    message += `最新数据：${allShops.length} 家\n\n`;
+
+                    if (hasChanges) {
+                        if (changes.added.length > 0) {
+                            message += `🆕 新增：${changes.added.length} 家\n`;
+                            changes.added.forEach(s => {
+                                message += `  · ${s.name}\n`;
+                            });
+                        }
+                        if (changes.removed.length > 0) {
+                            message += `\n❌ 移除：${changes.removed.length} 家\n`;
+                            changes.removed.forEach(s => {
+                                message += `  · ${s.name}\n`;
+                            });
+                        }
+                        if (changes.updated.length > 0) {
+                            message += `\n📝 信息更新：${changes.updated.length} 家\n`;
+                            changes.updated.forEach(s => {
+                                message += `  · ${s.name}\n`;
+                            });
+                        }
+                        message += `\n是否更新地图数据？`;
+                    } else {
+                        message += `✅ 数据已是最新，无需更新`;
+                    }
+
+                    // 隐藏加载提示
+                    loading.classList.add('hidden');
+                    btn.disabled = false;
+                    btn.textContent = '🔄 更新商家';
+
+                    if (hasChanges) {
+                        // 有变化，询问是否更新
+                        if (confirm(message)) {
+                            // 用户确认更新
+                            shops = allShops;
+                            showShops();
+                            document.getElementById('updateTime').textContent =
+                                `数据更新: ${new Date().toLocaleString('zh-CN')} (共${shops.length}家)`;
+                            alert(`✅ 更新完成！\n当前共 ${shops.length} 家商家`);
+                        }
+                    } else {
+                        // 无变化，仅提示
+                        alert(message);
+                    }
+                } else {
+                    loading.classList.add('hidden');
+                    alert('⚠️ 未获取到数据，请稍后重试');
+                }
+
+            } catch (error) {
+                console.error('更新失败:', error);
+                alert('❌ 更新失败，请检查网络连接');
+            } finally {
+                // 恢复按钮
+                btn.disabled = false;
+                btn.textContent = '🔄 更新商家';
+                loading.classList.add('hidden');
+            }
+        }
+
+        // 页面加载完成后初始化地图
+        window.onload = initMap;
+    </script>
+</body>
+</html>

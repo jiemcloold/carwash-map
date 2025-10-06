@@ -1,0 +1,14 @@
+{
+  "name": "carwash-map",
+  "version": "1.0.0",
+  "description": "洗车商家地图生成器",
+  "main": "index.js",
+  "scripts": {
+    "fetch": "node fetch-shops.js",
+    "generate": "node generate-map.js",
+    "update": "npm run fetch && npm run generate"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}
