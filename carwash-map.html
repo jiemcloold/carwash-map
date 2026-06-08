@@ -128,39 +128,6 @@
             opacity: 1;
         }
 
-        .shop-marker {
-            width: 30px;
-            height: 40px;
-            position: relative;
-            transform: translate(-15px, -40px);
-        }
-
-        .shop-marker::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: #1989fa;
-            border: 2px solid white;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.28);
-        }
-
-        .shop-marker::after {
-            content: "";
-            position: absolute;
-            left: 10px;
-            top: 10px;
-            width: 10px;
-            height: 10px;
-            background: white;
-            border-radius: 50%;
-        }
-
-        .shop-marker.recommended::before {
-            background: #ff4d4f;
-        }
-
         .location-marker {
             width: 30px;
             height: 30px;
@@ -168,7 +135,6 @@
             background: #00a870;
             border: 3px solid white;
             box-shadow: 0 0 0 6px rgba(0,168,112,0.18), 0 2px 8px rgba(0,0,0,0.22);
-            transform: translate(-15px, -15px);
         }
 
         .info-window {
@@ -262,7 +228,7 @@
 
     <div id="info">
         <div id="infoText">正在定位...</div>
-        <div id="updateTime">数据更新: 2026/6/8 12:15:17（共 156 家）</div>
+        <div id="updateTime">数据更新: 2026/6/8 12:37:13（共 156 家）</div>
     </div>
 
     <button id="cancelRouteBtn" class="cancel-route-btn hidden" onclick="cancelRoute()">✕ 取消路线</button>
@@ -282,6 +248,7 @@
         let routeRankingToken = 0;
         let routeServiceAvailable = true;
         let routeServiceError = '';
+        let lastInfoWindowAction = { key: '', time: 0 };
         const routeSummaries = new Map();
         const ROUTE_RANK_LIMIT = 8;
         const AUTO_ROUTE_RANK_ENABLED = true;
@@ -353,6 +320,7 @@
                     new AMap.Marker({
                         position: [myLocation.lng, myLocation.lat],
                         content: '<div class="location-marker"></div>',
+                        offset: new AMap.Pixel(-15, -15),
                         zIndex: 200,
                         map
                     });
@@ -405,7 +373,8 @@
                 const isRecommended = recommendedShop && getShopKey(shop) === getShopKey(recommendedShop);
                 const marker = new AMap.Marker({
                     position: [shop.lng, shop.lat],
-                    content: '<div class="shop-marker ' + (isRecommended ? 'recommended' : '') + '"></div>',
+                    icon: createShopMarkerIcon(isRecommended),
+                    offset: new AMap.Pixel(-15, -40),
                     zIndex: isRecommended ? 120 : 90,
                     map
                 });
@@ -474,6 +443,28 @@
                 .sort((a, b) => a.routeDuration - b.routeDuration);
 
             return routeRanked[0] || sortedShops[0];
+        }
+
+        function createShopMarkerIcon(isRecommended) {
+            const fill = isRecommended ? '#ff4d4f' : '#1989fa';
+            return new AMap.Icon({
+                size: new AMap.Size(30, 40),
+                image: markerSvgDataUrl(fill),
+                imageSize: new AMap.Size(30, 40)
+            });
+        }
+
+        function markerSvgDataUrl(fill) {
+            const svg =
+                '<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">' +
+                '<filter id="s" x="-40%" y="-30%" width="180%" height="180%">' +
+                '<feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.28"/>' +
+                '</filter>' +
+                '<path filter="url(#s)" d="M15 1C7.3 1 1.2 7.1 1.2 14.7C1.2 25.2 15 39 15 39S28.8 25.2 28.8 14.7C28.8 7.1 22.7 1 15 1Z" fill="' + fill + '" stroke="#fff" stroke-width="2"/>' +
+                '<circle cx="15" cy="14.5" r="5" fill="#fff"/>' +
+                '</svg>';
+
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         }
 
         async function rankNearbyByDrivingRoute(sortedShops) {
@@ -599,19 +590,63 @@
                 <div class="info-window">
                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
                         <h3>${escapeHtml(shop.name)}</h3>
-                        <button class="copy-btn" onclick="copyText(decodeURIComponent('${encodedValue(shop.name)}'), '店名')">复制</button>
+                        <button class="copy-btn" data-action="copy" data-label="店名" data-value="${encodedValue(shop.name)}">复制</button>
                     </div>
                     <div class="info-row">
                         <span>${escapeHtml(shop.address)}</span>
-                        <button class="copy-btn" onclick="copyText(decodeURIComponent('${encodedValue(shop.address)}'), '地址')">复制</button>
+                        <button class="copy-btn" data-action="copy" data-label="地址" data-value="${encodedValue(shop.address)}">复制</button>
                     </div>
                     ${shop.phone ? '<div class="info-row"><span><a href="tel:' + escapeHtml(shop.phone) + '" class="info-phone">' + escapeHtml(shop.phone) + '</a></span></div>' : ''}
                     ${shop.workTime ? '<div class="info-row"><span>' + escapeHtml(shop.workTime) + '</span></div>' : ''}
                     ${routeText}
-                    <button class="nav-btn" onclick="navigateTo(${shop.lat}, ${shop.lng}, decodeURIComponent('${encodedValue(shop.name)}'))">高德地图导航</button>
-                    ${myLocation ? `<button class="route-btn" onclick="showRouteTo(${shop.lat}, ${shop.lng}, decodeURIComponent('${encodedValue(shop.name)}'))">显示路线</button>` : ''}
+                    <button class="nav-btn" data-action="nav" data-lat="${shop.lat}" data-lng="${shop.lng}" data-name="${encodedValue(shop.name)}">高德地图导航</button>
+                    ${myLocation ? `<button class="route-btn" data-action="route" data-lat="${shop.lat}" data-lng="${shop.lng}" data-name="${encodedValue(shop.name)}">显示路线</button>` : ''}
                 </div>
             `;
+        }
+
+        function handleInfoWindowAction(event) {
+            const button = event.target.closest('[data-action]');
+            if (!button || !button.closest('.info-window')) {
+                return;
+            }
+
+            const key = [
+                button.dataset.action,
+                button.dataset.lat || '',
+                button.dataset.lng || '',
+                button.dataset.name || '',
+                button.dataset.value || ''
+            ].join('|');
+            const now = Date.now();
+
+            if (lastInfoWindowAction.key === key && now - lastInfoWindowAction.time < 350) {
+                return;
+            }
+
+            lastInfoWindowAction = { key, time: now };
+            event.preventDefault();
+            event.stopPropagation();
+
+            const action = button.dataset.action;
+            if (action === 'copy') {
+                copyText(decodeURIComponent(button.dataset.value || ''), button.dataset.label || '');
+                return;
+            }
+
+            const lat = Number(button.dataset.lat);
+            const lng = Number(button.dataset.lng);
+            const name = decodeURIComponent(button.dataset.name || '');
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                return;
+            }
+
+            if (action === 'route') {
+                showRouteTo(lat, lng, name);
+            } else if (action === 'nav') {
+                navigateTo(lat, lng, name);
+            }
         }
 
         async function showRouteTo(destLat, destLng, shopName) {
@@ -691,7 +726,55 @@
         }
 
         function navigateTo(lat, lng, name) {
-            window.location.href = `https://uri.amap.com/navigation?to=${lng},${lat}&toname=${encodeURIComponent(name)}&mode=car&policy=1&coordinate=gaode&src=carwash`;
+            const webUrl = buildAmapWebNavigationUrl(lat, lng, name);
+            const encodedName = encodeURIComponent(name || '目的地');
+            const userAgent = navigator.userAgent.toLowerCase();
+
+            if (/iphone|ipad|ipod/.test(userAgent)) {
+                openNativeAmap(
+                    `iosamap://path?sourceApplication=carwash&dlat=${lat}&dlon=${lng}&dname=${encodedName}&dev=0&t=0`,
+                    webUrl
+                );
+                return;
+            }
+
+            if (/android/.test(userAgent)) {
+                openNativeAmap(
+                    `androidamap://route/plan/?sourceApplication=carwash&dlat=${lat}&dlon=${lng}&dname=${encodedName}&dev=0&t=0`,
+                    webUrl
+                );
+                return;
+            }
+
+            window.location.href = webUrl;
+        }
+
+        function buildAmapWebNavigationUrl(lat, lng, name) {
+            const params = [];
+
+            if (myLocation) {
+                params.push(`from=${myLocation.lng},${myLocation.lat},${encodeURIComponent('我的位置')}`);
+            }
+
+            params.push(`to=${lng},${lat},${encodeURIComponent(name || '目的地')}`);
+            params.push('mode=car');
+            params.push('policy=1');
+            params.push('coordinate=gaode');
+            params.push('callnative=1');
+            params.push('src=carwash');
+
+            return 'https://uri.amap.com/navigation?' + params.join('&');
+        }
+
+        function openNativeAmap(nativeUrl, fallbackUrl) {
+            const startedAt = Date.now();
+            window.location.href = nativeUrl;
+
+            setTimeout(() => {
+                if (document.visibilityState === 'visible' && Date.now() - startedAt < 2200) {
+                    window.location.href = fallbackUrl;
+                }
+            }, 1200);
         }
 
         function showToast(message) {
@@ -960,6 +1043,9 @@
         function encodedValue(value) {
             return encodeURIComponent(String(value || ''));
         }
+
+        document.addEventListener('click', handleInfoWindowAction, true);
+        document.addEventListener('touchend', handleInfoWindowAction, { capture: true, passive: false });
 
         window.onload = initMap;
     </script>
