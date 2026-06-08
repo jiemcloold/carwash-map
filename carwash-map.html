@@ -228,7 +228,7 @@
 
     <div id="info">
         <div id="infoText">正在定位...</div>
-        <div id="updateTime">数据更新: 2026/6/8 12:37:13（共 156 家）</div>
+        <div id="updateTime">数据更新: 2026/6/8 12:57:00（共 156 家）</div>
     </div>
 
     <button id="cancelRouteBtn" class="cancel-route-btn hidden" onclick="cancelRoute()">✕ 取消路线</button>
@@ -248,6 +248,7 @@
         let routeRankingToken = 0;
         let routeServiceAvailable = true;
         let routeServiceError = '';
+        let routeServiceErrorDetail = '';
         let lastInfoWindowAction = { key: '', time: 0 };
         const routeSummaries = new Map();
         const ROUTE_RANK_LIMIT = 8;
@@ -495,17 +496,15 @@
 
                     const summary = await searchDrivingSummary(shop);
                     routeSummaries.set(getShopKey(shop), summary);
-                    if (summary.routeServiceUnavailable) {
+                    if (summary.routeAuthorizationFailed) {
                         break;
                     }
                 }
             } catch (error) {
                 console.error('附近路线估算失败:', error);
-                routeServiceAvailable = false;
-                routeServiceError = '高德路线服务暂不可用';
             }
 
-            if (token === routeRankingToken) {
+            if (token === routeRankingToken && !currentDriving) {
                 showShops({ skipRouteEstimate: true });
             }
         }
@@ -528,18 +527,49 @@
                                 routeDuration: Math.ceil(route.time / 60)
                             });
                         } else {
-                            if (status === 'error') {
+                            const failure = createRouteFailure(status, result);
+                            if (failure.routeAuthorizationFailed) {
                                 routeServiceAvailable = false;
-                                routeServiceError = '高德路线服务未授权，请更换高德 Key/安全密钥';
-                                resolve({ routeFailed: true, routeServiceUnavailable: true });
-                                return;
+                                routeServiceError = failure.routeErrorMessage;
+                                routeServiceErrorDetail = failure.routeErrorDetail;
                             }
-
-                            resolve({ routeFailed: true });
+                            resolve(failure);
                         }
                     }
                 );
             });
+        }
+
+        function createRouteFailure(status, result) {
+            const routeErrorDetail = getRouteErrorDetail(status, result);
+            const routeAuthorizationFailed = isRouteAuthorizationFailure(routeErrorDetail);
+
+            return {
+                routeFailed: true,
+                routeAuthorizationFailed,
+                routeErrorMessage: routeAuthorizationFailed
+                    ? '高德路线服务授权失败'
+                    : '这家店暂时无法规划路线',
+                routeErrorDetail
+            };
+        }
+
+        function getRouteErrorDetail(status, result) {
+            const parts = ['status=' + (status || 'unknown')];
+
+            if (result && typeof result === 'object') {
+                ['info', 'infocode', 'message'].forEach(key => {
+                    if (result[key]) {
+                        parts.push(key + '=' + result[key]);
+                    }
+                });
+            }
+
+            return parts.join('; ');
+        }
+
+        function isRouteAuthorizationFailure(detail) {
+            return /INVALID_USER_KEY|INVALID_USER_DOMAIN|INVALID_USER_SCODE|USERKEY_PLAT_NOMATCH|INSUFFICIENT_PRIVILEGES|USER_KEY_RECYCLED/i.test(detail || '');
         }
 
         function updateInfoText(sortedShops, estimatingRoutes) {
@@ -572,7 +602,8 @@
             if (!routeServiceAvailable) {
                 infoText.innerHTML =
                     '最近: <strong>' + escapeHtml(shop.name) + '</strong>（直线 ' + formatDistance(shop.distance) + '）' +
-                    '<div style="margin-top:4px;color:#c05a00;">' + escapeHtml(routeServiceError || '高德路线服务暂不可用') + '</div>';
+                    '<div style="margin-top:4px;color:#c05a00;">' + escapeHtml(routeServiceError || '高德路线服务授权失败') +
+                    (routeServiceErrorDetail ? '（' + escapeHtml(routeServiceErrorDetail) + '）' : '') + '</div>';
                 return;
             }
 
@@ -657,11 +688,14 @@
 
             if (!routeServiceAvailable) {
                 document.getElementById('infoText').innerHTML =
-                    escapeHtml(routeServiceError || '高德路线服务暂不可用') + '，可先使用高德地图导航';
+                    escapeHtml(routeServiceError || '高德路线服务授权失败') +
+                    (routeServiceErrorDetail ? '（' + escapeHtml(routeServiceErrorDetail) + '）' : '') +
+                    '，可先使用高德地图导航';
                 return;
             }
 
             clearCurrentRoute();
+            routeRankingToken++;
             document.getElementById('infoText').innerHTML = '正在规划路线...';
 
             try {
@@ -697,12 +731,18 @@
                                 '</strong> 分钟 / <strong>' + routeDistance.toFixed(1) + '</strong> 公里</div>';
                             document.getElementById('cancelRouteBtn').classList.remove('hidden');
                         } else {
-                            if (status === 'error') {
+                            const failure = createRouteFailure(status, result);
+
+                            if (failure.routeAuthorizationFailed) {
                                 routeServiceAvailable = false;
-                                routeServiceError = '高德路线服务未授权，请更换高德 Key/安全密钥';
+                                routeServiceError = failure.routeErrorMessage;
+                                routeServiceErrorDetail = failure.routeErrorDetail;
                             }
+
                             document.getElementById('infoText').innerHTML =
-                                escapeHtml(routeServiceError || '路线规划失败') + '，可先使用高德地图导航';
+                                escapeHtml(failure.routeErrorMessage) +
+                                (failure.routeErrorDetail ? '（' + escapeHtml(failure.routeErrorDetail) + '）' : '') +
+                                '，可先使用高德地图导航';
                         }
                     }
                 );
