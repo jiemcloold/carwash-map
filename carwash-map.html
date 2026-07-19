@@ -228,7 +228,7 @@
 
     <div id="info">
         <div id="infoText">正在定位...</div>
-        <div id="updateTime">数据更新: 2026/6/8 12:57:00（共 156 家）</div>
+        <div id="updateTime">数据更新: 2026/7/19 13:41:17（共 156 家）</div>
     </div>
 
     <button id="cancelRouteBtn" class="cancel-route-btn hidden" onclick="cancelRoute()">✕ 取消路线</button>
@@ -253,6 +253,7 @@
         const routeSummaries = new Map();
         const ROUTE_RANK_LIMIT = 8;
         const AUTO_ROUTE_RANK_ENABLED = true;
+        const PERSISTED_DATA_KEY = 'carwash-map-data-v1';
 
         const API_URL = 'https://chfwb.meiqitc.com/mqh5svr/serviceStore/byAddressDis';
         const API_PARAMS = {
@@ -271,6 +272,8 @@
         };
 
         function initMap() {
+            restorePersistedData();
+
             if (!window.AMap) {
                 document.getElementById('infoText').innerHTML = '地图加载失败，请检查网络';
                 document.getElementById('loading').classList.add('hidden');
@@ -284,6 +287,34 @@
             });
 
             getCurrentLocation();
+        }
+
+        function restorePersistedData() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(PERSISTED_DATA_KEY) || 'null');
+                if (!saved || !Array.isArray(saved.shops) || saved.shops.length === 0) {
+                    return;
+                }
+
+                shops = saved.shops;
+                if (saved.updatedAt) {
+                    document.getElementById('updateTime').textContent =
+                        '数据更新: ' + new Date(saved.updatedAt).toLocaleString('zh-CN') + '（共 ' + shops.length + ' 家）';
+                }
+            } catch (error) {
+                console.warn('读取本地商家数据失败，使用页面内嵌数据:', error);
+            }
+        }
+
+        function persistShopData(updatedAt) {
+            try {
+                localStorage.setItem(PERSISTED_DATA_KEY, JSON.stringify({
+                    shops,
+                    updatedAt
+                }));
+            } catch (error) {
+                console.warn('保存本地商家数据失败:', error);
+            }
         }
 
         function ensureDrivingPlugin() {
@@ -901,11 +932,13 @@
 
                     if (hasChanges && confirm(message)) {
                         shops = allShops;
+                        const updatedAt = new Date().toISOString();
+                        persistShopData(updatedAt);
                         routeSummaries.clear();
                         routeRankingToken++;
                         showShops();
                         document.getElementById('updateTime').textContent =
-                            '数据更新: ' + new Date().toLocaleString('zh-CN') + '（共 ' + shops.length + ' 家）';
+                            '数据更新: ' + new Date(updatedAt).toLocaleString('zh-CN') + '（共 ' + shops.length + ' 家）';
                         alert('更新完成，当前共 ' + shops.length + ' 家商家');
                     } else if (!hasChanges) {
                         alert(message);
